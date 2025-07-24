@@ -78,6 +78,8 @@
 # We use a full Rust image here as chef needs to compile itself.
 # Stage 0: Install cargo-chef and prepare the dependency recipe
 # We use a full Rust image here as chef needs to compile itself.
+# Stage 0: Install cargo-chef and prepare the dependency recipe
+# We use a full Rust image here as chef needs to compile itself.
 FROM rust:1.88-slim AS chef
 
 WORKDIR /usr/src/sniffnet
@@ -156,8 +158,10 @@ RUN apt-get update && apt-get install -y \
 COPY --from=planner /usr/src/sniffnet/target target
 COPY Cargo.toml Cargo.lock ./
 
-# Copy your actual source code. This layer invalidates frequently.
+# Copy your actual source code and resources.
+# This layer invalidates frequently, but now all necessary files are present.
 COPY src/ src/
+COPY resources/ resources/
 
 # Build the application. This step should be fast because dependencies are already built.
 RUN cargo build --release
@@ -180,6 +184,7 @@ COPY --from=builder /usr/src/sniffnet/target/release/sniffnet /usr/local/bin/sni
 
 # Set the entrypoint for the application.
 ENTRYPOINT ["sniffnet"]
+
 
 
 
