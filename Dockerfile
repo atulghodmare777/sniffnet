@@ -84,6 +84,8 @@
 # We use a full Rust image here as chef needs to compile itself.
 # Stage 0: Install cargo-chef and prepare the dependency recipe
 # We use a full Rust image here as chef needs to compile itself.
+# Stage 0: Install cargo-chef and prepare the dependency recipe
+# We use a full Rust image here as chef needs to compile itself.
 FROM rust:1.88-slim AS chef
 
 WORKDIR /usr/src/sniffnet
@@ -107,7 +109,7 @@ COPY Cargo.toml Cargo.lock ./
 
 # Create a dummy src/main.rs to satisfy cargo's requirement for a target.
 # This allows `cargo chef prepare` to run successfully.
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
 
 # Generate the dependency recipe. This recipe describes the dependencies.
 RUN cargo chef prepare --recipe-path recipe.json
@@ -157,11 +159,10 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the pre-compiled dependencies and their metadata from the 'planner' stage.
-# This includes the `deps` and `.fingerprint` directories within `target/release`.
-# This allows Cargo to reuse the compiled dependencies.
-COPY --from=planner /usr/src/sniffnet/target/release/deps /usr/src/sniffnet/target/release/deps
-COPY --from=planner /usr/src/sniffnet/target/release/.fingerprint /usr/src/sniffnet/target/release/.fingerprint
+# Copy the entire `target` directory from the 'planner' stage.
+# This includes all compiled dependencies and their metadata, allowing Cargo
+# to correctly reuse them and run `build.rs` for the main crate.
+COPY --from=planner /usr/src/sniffnet/target ./target
 
 # Copy Cargo.toml and Cargo.lock
 COPY Cargo.toml Cargo.lock ./
@@ -197,6 +198,7 @@ COPY --from=builder /usr/src/sniffnet/target/release/sniffnet /usr/local/bin/sni
 
 # Set the entrypoint for the application.
 ENTRYPOINT ["sniffnet"]
+
 
 
 
