@@ -3,7 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::borrow::Cow;
-
+println!("Hello from cache test!");
 use iced::advanced::graphics::image::image_rs::ImageFormat;
 #[cfg(target_os = "linux")]
 use iced::window::settings::PlatformSpecific;
