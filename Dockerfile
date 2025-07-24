@@ -76,6 +76,8 @@
 # We use a full Rust image here as chef needs to compile itself.
 # Stage 0: Install cargo-chef and prepare the dependency recipe
 # We use a full Rust image here as chef needs to compile itself.
+# Stage 0: Install cargo-chef and prepare the dependency recipe
+# We use a full Rust image here as chef needs to compile itself.
 FROM rust:1.88-slim AS chef
 
 WORKDIR /usr/src/sniffnet
@@ -121,6 +123,9 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-dev \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy the cargo-chef binary from the 'chef' stage to make it available in this stage.
+COPY --from=chef /usr/local/cargo/bin/cargo-chef /usr/local/bin/cargo-chef
 
 # Copy the generated recipe from the 'chef' stage.
 COPY --from=chef /usr/src/sniffnet/recipe.json recipe.json
@@ -175,7 +180,6 @@ COPY --from=builder /usr/src/sniffnet/target/release/sniffnet /usr/local/bin/sni
 
 # Set the entrypoint for the application.
 ENTRYPOINT ["sniffnet"]
-
 
 
 
