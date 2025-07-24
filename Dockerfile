@@ -80,6 +80,8 @@
 # We use a full Rust image here as chef needs to compile itself.
 # Stage 0: Install cargo-chef and prepare the dependency recipe
 # We use a full Rust image here as chef needs to compile itself.
+# Stage 0: Install cargo-chef and prepare the dependency recipe
+# We use a full Rust image here as chef needs to compile itself.
 FROM rust:1.88-slim AS chef
 
 WORKDIR /usr/src/sniffnet
@@ -132,9 +134,13 @@ COPY --from=chef /usr/local/cargo/bin/cargo-chef /usr/local/bin/cargo-chef
 # Copy the generated recipe from the 'chef' stage.
 COPY --from=chef /usr/src/sniffnet/recipe.json recipe.json
 
-# "Cook" (build) the dependencies based on the recipe.
+# Set CARGO_HOME to a custom path for the cache. This is where cargo-chef will put compiled dependencies.
+ENV CARGO_HOME=/usr/local/cargo_cache
+RUN mkdir -p ${CARGO_HOME}
+
+# "Cook" (build) the dependencies based on the recipe into the custom CARGO_HOME.
 # This is the most important caching layer. It only rebuilds if recipe.json changes.
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json --target-dir ${CARGO_HOME}/target
 
 # Stage 2: Build the application itself (the "builder" stage)
 # This stage copies your actual source code and compiles your application.
@@ -153,17 +159,23 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the pre-compiled dependencies from the 'planner' stage.
-# This makes the compiled dependencies available for the final build.
-COPY --from=planner /usr/src/sniffnet/target target
-COPY Cargo.toml Cargo.lock ./
+# Set CARGO_HOME to the same custom path as planner.
+ENV CARGO_HOME=/usr/local/cargo_cache
+RUN mkdir -p ${CARGO_HOME}
 
-# Copy your actual source code and resources.
-# This layer invalidates frequently, but now all necessary files are present.
+# Copy the pre-compiled dependencies from the 'planner' stage's custom CARGO_HOME.
+# This copies the entire dependency cache, which Cargo will reuse.
+COPY --from=planner ${CARGO_HOME} ${CARGO_HOME}
+
+# Copy Cargo.toml, Cargo.lock, src, and resources.
+# Ensure the actual src/main.rs and other source files are copied here, overwriting the dummy.
+COPY Cargo.toml Cargo.lock ./
 COPY src/ src/
 COPY resources/ resources/
 
-# Build the application. This step should be fast because dependencies are already built.
+# Build the application. This step will now find the cached dependencies and
+# crucially, will run the project's `build.rs` script to generate necessary files
+# like `services.rs` into its own OUT_DIR.
 RUN cargo build --release
 
 # Stage 3: Final slim runtime image (the "runner" stage)
@@ -184,6 +196,7 @@ COPY --from=builder /usr/src/sniffnet/target/release/sniffnet /usr/local/bin/sni
 
 # Set the entrypoint for the application.
 ENTRYPOINT ["sniffnet"]
+
 
 
 
